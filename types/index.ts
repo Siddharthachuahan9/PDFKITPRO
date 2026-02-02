@@ -64,6 +64,7 @@ export type PlanType = 'free' | 'pro' | 'business';
 export interface User {
   id: string;
   email: string;
+  name?: string;
   plan: PlanType;
   createdAt: Date;
 }
