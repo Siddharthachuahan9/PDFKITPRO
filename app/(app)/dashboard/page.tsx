@@ -2,36 +2,32 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Command } from 'lucide-react';
+import { Search } from 'lucide-react';
 import FeaturedTools from '@/components/FeaturedTools';
 import { AllToolSections } from '@/components/ToolSection';
 import UpgradeModal from '@/components/UpgradeModal';
 import CreditLine from '@/components/CreditLine';
-import TopBar from '@/components/TopBar';
 import { ContextRail } from '@/components/rail';
 import { cn } from '@/lib/utils';
 import { searchTools } from '@/lib/tools';
-import type { PlanType, Tool } from '@/types';
+import { useAuth } from '@/hooks/useAuth';
+import type { Tool } from '@/types';
 
-// Mock user data - in production, get from auth context
-const DEMO_PLAN: PlanType = 'free';
-const DEMO_USER = {
-  name: 'Guest User',
-  email: 'guest@example.com',
-};
-const DEMO_USAGE = {
-  filesProcessed: 12,
-  storageUsed: 24,
-  operationsToday: 3,
+// Default usage stats for demo
+const DEFAULT_USAGE = {
+  filesProcessed: 0,
+  storageUsed: 0,
+  operationsToday: 0,
 };
 
 export default function DashboardPage() {
+  const { user, isAuthenticated } = useAuth();
   const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Tool[]>([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  const userPlan = DEMO_PLAN;
+  const userPlan = user?.plan ?? 'free';
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -52,9 +48,10 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gradient-to-b from-cloud-gray to-white flex">
       {/* Context Rail - Left Side */}
       <ContextRail
-        user={DEMO_USER}
+        user={user ? { email: user.email, name: user.name } : undefined}
         plan={userPlan}
-        usage={DEMO_USAGE}
+        isAuthenticated={isAuthenticated}
+        usage={DEFAULT_USAGE}
       />
 
       {/* Main Dashboard Content */}

@@ -17,6 +17,7 @@ interface ContextRailProps {
     name?: string;
   };
   plan: PlanType;
+  isAuthenticated?: boolean;
   usage?: {
     filesProcessed: number;
     storageUsed: number;
@@ -28,6 +29,7 @@ interface ContextRailProps {
 export default function ContextRail({
   user,
   plan,
+  isAuthenticated,
   usage,
   className,
 }: ContextRailProps) {
@@ -75,6 +77,7 @@ export default function ContextRail({
           name={user?.name}
           plan={plan}
           isCollapsed={isCollapsed}
+          isAuthenticated={isAuthenticated}
         />
 
         {/* Privacy Panel */}
