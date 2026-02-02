@@ -89,7 +89,8 @@ export const TOOLS: Tool[] = [
     icon: 'PenTool',
     category: 'edit',
     isPro: false,
-    status: 'beta',
+    status: 'ready',
+    isFeatured: true,
   },
   {
     slug: 'crop',

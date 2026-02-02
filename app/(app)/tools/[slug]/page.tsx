@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
 import { getToolBySlug, TOOLS } from '@/lib/tools';
 import MergeTool from './merge-tool';
+import AddTextTool from './add-text-tool';
 
 interface ToolPageProps {
   params: Promise<{ slug: string }>;
@@ -36,10 +37,12 @@ export default async function ToolPage({ params }: ToolPageProps) {
     notFound();
   }
 
-  // For now, only merge tool is fully implemented
-  // Other tools will show a coming soon message
-  if (tool.slug === 'merge') {
-    return <MergeTool tool={tool} />;
+  // Render the appropriate tool component
+  switch (tool.slug) {
+    case 'merge':
+      return <MergeTool tool={tool} />;
+    case 'add-text':
+      return <AddTextTool tool={tool} />;
   }
 
   // Placeholder for other tools

@@ -29,7 +29,9 @@ export default function PdfViewer({ file, className }: PdfViewerProps) {
 
   // Render PDF page using PDF.js
   useEffect(() => {
-    if (!file) return;
+    if (!file || !file.data) return;
+
+    let isMounted = true;
 
     const renderPage = async () => {
       setLoading(true);
@@ -38,32 +40,67 @@ export default function PdfViewer({ file, className }: PdfViewerProps) {
         const pdfjs = await import('pdfjs-dist');
         pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
-        const pdf = await pdfjs.getDocument({ data: file.data }).promise;
+        // Convert ArrayBuffer to Uint8Array for better compatibility
+        // Also create a copy to avoid detached ArrayBuffer issues
+        const uint8Array = new Uint8Array(file.data.slice(0));
+
+        const pdf = await pdfjs.getDocument({ data: uint8Array }).promise;
+
+        if (!isMounted) {
+          pdf.destroy();
+          return;
+        }
+
         const page = await pdf.getPage(currentPage);
+
+        if (!isMounted) {
+          pdf.destroy();
+          return;
+        }
 
         const scale = zoom / 100;
         const viewport = page.getViewport({ scale, rotation });
 
         const canvas = canvasRef.current;
-        if (!canvas) return;
+        if (!canvas) {
+          pdf.destroy();
+          return;
+        }
 
         const context = canvas.getContext('2d');
-        if (!context) return;
+        if (!context) {
+          pdf.destroy();
+          return;
+        }
 
         canvas.width = viewport.width;
         canvas.height = viewport.height;
 
         await page.render({ canvasContext: context, viewport }).promise;
 
-        setImageUrl(canvas.toDataURL());
+        if (isMounted) {
+          setImageUrl(canvas.toDataURL());
+        }
+
+        // Clean up PDF resources
+        pdf.destroy();
       } catch (error) {
         console.error('Failed to render PDF page:', error);
+        if (isMounted) {
+          setImageUrl(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     renderPage();
+
+    return () => {
+      isMounted = false;
+    };
   }, [file, currentPage, zoom, rotation]);
 
   if (!file) {
