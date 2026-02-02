@@ -1,5 +1,6 @@
 'use client';
 
+import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react';
 import { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import type { User, PlanType } from '@/types';
 
@@ -10,76 +11,62 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (email: string) => Promise<void>;
-  logout: () => void;
+  signIn: (provider?: string) => Promise<void>;
+  signOut: () => Promise<void>;
   upgradePlan: (plan: PlanType) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const STORAGE_KEY = 'pdfkit-user';
-
-// Demo user for local development
-const createDemoUser = (plan: PlanType = 'free'): User => ({
-  id: 'demo-user',
-  email: 'demo@pdfkit.pro',
-  plan,
-  createdAt: new Date(),
-});
+const PLAN_STORAGE_KEY = 'pdfkit-user-plan';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
-    user: null,
-    isLoading: true,
-    isAuthenticated: false,
-  });
+  const { data: session, status } = useSession();
+  const [plan, setPlan] = useState<PlanType>('free');
 
-  // Load user from localStorage on mount
+  // Load plan from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const user = JSON.parse(stored) as User;
-        setState({ user, isLoading: false, isAuthenticated: true });
-      } catch {
-        setState({ user: null, isLoading: false, isAuthenticated: false });
-      }
-    } else {
-      // Auto-create demo user for local-first experience
-      const demoUser = createDemoUser('free');
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(demoUser));
-      setState({ user: demoUser, isLoading: false, isAuthenticated: true });
+    const stored = localStorage.getItem(PLAN_STORAGE_KEY);
+    if (stored && ['free', 'pro', 'business'].includes(stored)) {
+      setPlan(stored as PlanType);
     }
   }, []);
 
-  const login = useCallback(async (email: string) => {
-    // In production, this would call the auth API
-    const user: User = {
-      id: `user-${Date.now()}`,
-      email,
-      plan: 'free',
-      createdAt: new Date(),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    setState({ user, isLoading: false, isAuthenticated: true });
+  const user = session?.user
+    ? {
+        id: session.user.id || session.user.email || 'unknown',
+        email: session.user.email || '',
+        name: session.user.name || undefined,
+        plan,
+        createdAt: new Date(),
+      }
+    : null;
+
+  const signIn = useCallback(async (provider?: string) => {
+    await nextAuthSignIn(provider, { callbackUrl: '/dashboard' });
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    setState({ user: null, isLoading: false, isAuthenticated: false });
+  const signOut = useCallback(async () => {
+    await nextAuthSignOut({ callbackUrl: '/' });
   }, []);
 
-  const upgradePlan = useCallback((plan: PlanType) => {
-    setState((prev) => {
-      if (!prev.user) return prev;
-      const updatedUser = { ...prev.user, plan };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUser));
-      return { ...prev, user: updatedUser };
-    });
+  const upgradePlan = useCallback((newPlan: PlanType) => {
+    setPlan(newPlan);
+    localStorage.setItem(PLAN_STORAGE_KEY, newPlan);
+    // In production, this would also update the database via API
   }, []);
+
+  const value: AuthContextValue = {
+    user,
+    isLoading: status === 'loading',
+    isAuthenticated: status === 'authenticated',
+    signIn,
+    signOut,
+    upgradePlan,
+  };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, upgradePlan }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -88,7 +75,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    // Return a default context for server-side rendering or when outside provider
+    return {
+      user: null,
+      isLoading: true,
+      isAuthenticated: false,
+      signIn: async () => {},
+      signOut: async () => {},
+      upgradePlan: () => {},
+    };
   }
   return context;
 }
@@ -101,4 +96,25 @@ export function useUser(): User | null {
 export function usePlan(): PlanType {
   const { user } = useAuth();
   return user?.plan ?? 'free';
+}
+
+// Hook for checking if user has access to a feature
+export function useFeatureAccess(feature: string): boolean {
+  const plan = usePlan();
+
+  const featureAccess: Record<string, PlanType[]> = {
+    ai: ['pro', 'business'],
+    cloud: ['pro', 'business'],
+    teams: ['business'],
+    redact: ['pro', 'business'],
+    compare: ['pro', 'business'],
+    ocr: ['pro', 'business'],
+    watermark: ['free', 'pro', 'business'],
+    merge: ['free', 'pro', 'business'],
+    split: ['free', 'pro', 'business'],
+    compress: ['free', 'pro', 'business'],
+  };
+
+  const allowedPlans = featureAccess[feature] || ['free', 'pro', 'business'];
+  return allowedPlans.includes(plan);
 }
