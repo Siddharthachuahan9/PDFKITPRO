@@ -18,6 +18,9 @@ export interface PdfFile {
   createdAt: number;
 }
 
+// Tool status
+export type ToolStatus = 'ready' | 'beta' | 'pro' | 'soon';
+
 // Tool definition
 export interface Tool {
   slug: string;
@@ -26,7 +29,19 @@ export interface Tool {
   icon: string;
   category: ToolCategory;
   isPro: boolean;
+  status: ToolStatus;
+  isFeatured?: boolean;
 }
+
+// Feature flags
+export type Feature = 'ai' | 'cloud' | 'teams' | 'redact' | 'compare' | 'ocr';
+
+// Feature access by plan
+export const PLAN_FEATURES: Record<PlanType, Feature[]> = {
+  free: [],
+  pro: ['ai', 'cloud', 'redact', 'compare', 'ocr'],
+  business: ['ai', 'cloud', 'teams', 'redact', 'compare', 'ocr'],
+};
 
 export type ToolCategory =
   | 'essentials'
