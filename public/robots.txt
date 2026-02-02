@@ -1,0 +1,9 @@
+# PDFKit Pro - robots.txt
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://pdfkit.pro/sitemap.xml
+
+# Disallow API routes
+Disallow: /api/
