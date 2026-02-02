@@ -20,6 +20,8 @@ export const TOOLS: Tool[] = [
     icon: 'Merge',
     category: 'essentials',
     isPro: false,
+    status: 'ready',
+    isFeatured: true,
   },
   {
     slug: 'compress',
@@ -28,6 +30,8 @@ export const TOOLS: Tool[] = [
     icon: 'Minimize2',
     category: 'essentials',
     isPro: false,
+    status: 'ready',
+    isFeatured: true,
   },
   {
     slug: 'pdf-to-jpg',
@@ -36,6 +40,8 @@ export const TOOLS: Tool[] = [
     icon: 'Image',
     category: 'essentials',
     isPro: false,
+    status: 'ready',
+    isFeatured: true,
   },
   {
     slug: 'split',
@@ -44,6 +50,7 @@ export const TOOLS: Tool[] = [
     icon: 'Scissors',
     category: 'essentials',
     isPro: false,
+    status: 'ready',
   },
   {
     slug: 'word-to-pdf',
@@ -52,6 +59,7 @@ export const TOOLS: Tool[] = [
     icon: 'FileText',
     category: 'essentials',
     isPro: false,
+    status: 'soon',
   },
   {
     slug: 'images-to-pdf',
@@ -60,6 +68,8 @@ export const TOOLS: Tool[] = [
     icon: 'Images',
     category: 'essentials',
     isPro: false,
+    status: 'ready',
+    isFeatured: true,
   },
 
   // Edit & Organize
@@ -70,6 +80,7 @@ export const TOOLS: Tool[] = [
     icon: 'Type',
     category: 'edit',
     isPro: false,
+    status: 'ready',
   },
   {
     slug: 'add-text',
@@ -78,6 +89,7 @@ export const TOOLS: Tool[] = [
     icon: 'PenTool',
     category: 'edit',
     isPro: false,
+    status: 'beta',
   },
   {
     slug: 'crop',
@@ -86,6 +98,7 @@ export const TOOLS: Tool[] = [
     icon: 'Crop',
     category: 'edit',
     isPro: false,
+    status: 'soon',
   },
   {
     slug: 'organize',
@@ -94,6 +107,7 @@ export const TOOLS: Tool[] = [
     icon: 'LayoutGrid',
     category: 'edit',
     isPro: false,
+    status: 'ready',
   },
   {
     slug: 'watermark',
@@ -102,6 +116,7 @@ export const TOOLS: Tool[] = [
     icon: 'Droplet',
     category: 'edit',
     isPro: false,
+    status: 'soon',
   },
   {
     slug: 'page-numbers',
@@ -110,6 +125,7 @@ export const TOOLS: Tool[] = [
     icon: 'Hash',
     category: 'edit',
     isPro: false,
+    status: 'soon',
   },
 
   // Security
@@ -120,6 +136,8 @@ export const TOOLS: Tool[] = [
     icon: 'Lock',
     category: 'security',
     isPro: false,
+    status: 'ready',
+    isFeatured: true,
   },
   {
     slug: 'unlock',
@@ -128,6 +146,7 @@ export const TOOLS: Tool[] = [
     icon: 'Unlock',
     category: 'security',
     isPro: false,
+    status: 'ready',
   },
   {
     slug: 'redact',
@@ -136,6 +155,7 @@ export const TOOLS: Tool[] = [
     icon: 'EyeOff',
     category: 'security',
     isPro: true,
+    status: 'pro',
   },
   {
     slug: 'metadata',
@@ -144,6 +164,7 @@ export const TOOLS: Tool[] = [
     icon: 'FileX',
     category: 'security',
     isPro: false,
+    status: 'ready',
   },
 
   // Advanced
@@ -154,14 +175,17 @@ export const TOOLS: Tool[] = [
     icon: 'GitCompare',
     category: 'advanced',
     isPro: true,
+    status: 'pro',
   },
   {
     slug: 'chat',
     name: 'Chat with PDF',
-    description: 'Ask questions about your document',
+    description: 'Ask questions about your document using AI',
     icon: 'MessageSquare',
     category: 'advanced',
     isPro: true,
+    status: 'pro',
+    isFeatured: true,
   },
   {
     slug: 'ocr',
@@ -170,6 +194,7 @@ export const TOOLS: Tool[] = [
     icon: 'ScanText',
     category: 'advanced',
     isPro: true,
+    status: 'pro',
   },
   {
     slug: 'markdown-to-pdf',
@@ -178,6 +203,7 @@ export const TOOLS: Tool[] = [
     icon: 'Code',
     category: 'advanced',
     isPro: false,
+    status: 'soon',
   },
   {
     slug: 'html-to-pdf',
@@ -186,6 +212,7 @@ export const TOOLS: Tool[] = [
     icon: 'Globe',
     category: 'advanced',
     isPro: false,
+    status: 'soon',
   },
 ];
 
@@ -195,6 +222,10 @@ export function getToolBySlug(slug: string): Tool | undefined {
 
 export function getToolsByCategory(category: ToolCategory): Tool[] {
   return TOOLS.filter((tool) => tool.category === category);
+}
+
+export function getFeaturedTools(): Tool[] {
+  return TOOLS.filter((tool) => tool.isFeatured);
 }
 
 export function searchTools(query: string): Tool[] {
