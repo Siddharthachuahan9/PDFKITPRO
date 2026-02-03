@@ -1,211 +1,307 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
-import FeaturedTools from '@/components/FeaturedTools';
-import { AllToolSections } from '@/components/ToolSection';
-import UpgradeModal from '@/components/UpgradeModal';
-import CreditLine from '@/components/CreditLine';
-import { ContextRail } from '@/components/rail';
-import { cn } from '@/lib/utils';
-import { searchTools } from '@/lib/tools';
+import Link from 'next/link';
+import {
+  Merge,
+  Scissors,
+  Minimize2,
+  Image,
+  FileText,
+  Lock,
+  Pen,
+  ArrowRight,
+  Sparkles,
+  Shield,
+  Zap,
+  Globe,
+} from 'lucide-react';
+import WorkspaceLayout from '@/components/layout/WorkspaceLayout';
+import FileDropZone, { type DroppedFile } from '@/components/workflow/FileDropZone';
+import JobTimeline from '@/components/workflow/JobTimeline';
 import { useAuth } from '@/hooks/useAuth';
-import type { Tool } from '@/types';
+import { cn } from '@/lib/utils';
 
-// Default usage stats for demo
-const DEFAULT_USAGE = {
-  filesProcessed: 0,
-  storageUsed: 0,
-  operationsToday: 0,
-};
+const QUICK_TOOLS = [
+  {
+    name: 'Merge PDF',
+    description: 'Combine multiple PDFs into one',
+    slug: 'merge',
+    icon: Merge,
+    color: 'from-blue-500 to-indigo-600',
+  },
+  {
+    name: 'Split PDF',
+    description: 'Extract pages or split documents',
+    slug: 'split',
+    icon: Scissors,
+    color: 'from-violet-500 to-purple-600',
+  },
+  {
+    name: 'Compress',
+    description: 'Reduce PDF file size',
+    slug: 'compress',
+    icon: Minimize2,
+    color: 'from-emerald-500 to-teal-600',
+  },
+  {
+    name: 'PDF to Image',
+    description: 'Convert PDF pages to images',
+    slug: 'pdf-to-jpg',
+    icon: Image,
+    color: 'from-amber-500 to-orange-600',
+  },
+  {
+    name: 'Image to PDF',
+    description: 'Convert images to PDF',
+    slug: 'jpg-to-pdf',
+    icon: FileText,
+    color: 'from-pink-500 to-rose-600',
+  },
+  {
+    name: 'Add Text',
+    description: 'Add text and signatures',
+    slug: 'add-text',
+    icon: Pen,
+    color: 'from-cyan-500 to-blue-600',
+  },
+];
+
+const FEATURES = [
+  {
+    icon: Shield,
+    title: 'Privacy First',
+    description: 'Files never leave your device. All processing happens locally.',
+  },
+  {
+    icon: Zap,
+    title: 'Lightning Fast',
+    description: 'WebAssembly-powered processing for instant results.',
+  },
+  {
+    icon: Globe,
+    title: 'Works Offline',
+    description: 'Full functionality without an internet connection.',
+  },
+];
 
 export default function DashboardPage() {
   const { user, isAuthenticated } = useAuth();
-  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<Tool[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<DroppedFile[]>([]);
 
-  const userPlan = user?.plan ?? 'free';
+  const handleFilesAdded = useCallback((files: File[]) => {
+    const newFiles: DroppedFile[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+    }));
+    setDroppedFiles((prev) => [...prev, ...newFiles]);
+  }, []);
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    if (query.trim()) {
-      setIsSearching(true);
-      setSearchResults(searchTools(query));
-    } else {
-      setIsSearching(false);
-      setSearchResults([]);
-    }
-  };
-
-  const handleUpgradeClick = () => {
-    setIsUpgradeOpen(true);
-  };
+  const handleFileRemoved = useCallback((fileId: string) => {
+    setDroppedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-cloud-gray to-white flex">
-      {/* Context Rail - Left Side */}
-      <ContextRail
-        user={user ? { email: user.email, name: user.name } : undefined}
-        plan={userPlan}
-        isAuthenticated={isAuthenticated}
-        usage={DEFAULT_USAGE}
-      />
+    <WorkspaceLayout>
+      <div className="h-full overflow-auto">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          {/* Welcome Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <h1 className="text-3xl font-bold text-slate-dark mb-2">
+              {isAuthenticated && user?.name
+                ? `Welcome back, ${user.name.split(' ')[0]}`
+                : 'Welcome to PDFKit Pro'}
+            </h1>
+            <p className="text-gray-500">
+              Professional PDF tools that run locally in your browser
+            </p>
+          </motion.div>
 
-      {/* Main Dashboard Content */}
-      <div className="flex-1 min-h-screen overflow-x-hidden">
-        {/* Command Center Header */}
-        <div className="bg-white/50 backdrop-blur-sm border-b border-gray-100/50">
-          <div className="max-w-6xl mx-auto px-4 lg:px-8 py-8">
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center mb-8"
-            >
-              <h1 className="text-3xl lg:text-4xl font-bold text-slate-dark mb-3">
-                Command Center
-              </h1>
-              <p className="text-gray-500 max-w-lg mx-auto">
-                Professional PDF tools that run locally in your browser.
-                Your files never leave your device.
-              </p>
-            </motion.div>
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Drop Zone */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                  <h2 className="font-semibold text-slate-dark mb-4">Quick Start</h2>
+                  <FileDropZone
+                    onFilesAdded={handleFilesAdded}
+                    onFileRemoved={handleFileRemoved}
+                    files={droppedFiles}
+                    compact={droppedFiles.length > 0}
+                  />
 
-            {/* Search Bar */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="max-w-xl mx-auto"
-            >
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => handleSearch(e.target.value)}
-                  placeholder="Search tools..."
-                  className={cn(
-                    'w-full pl-12 pr-24 py-4 rounded-2xl',
-                    'bg-white border border-gray-200',
-                    'text-slate-dark placeholder:text-gray-400',
-                    'focus:outline-none focus:ring-2 focus:ring-privacy-teal/20 focus:border-privacy-teal',
-                    'shadow-soft hover:shadow-medium transition-all duration-200'
+                  {droppedFiles.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-sm text-gray-500 mb-3">
+                        What would you like to do with these files?
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {QUICK_TOOLS.slice(0, 4).map((tool) => (
+                          <Link
+                            key={tool.slug}
+                            href={`/tools/${tool.slug}`}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-50 hover:bg-gray-100 text-sm font-medium text-slate-dark transition-colors"
+                          >
+                            <tool.icon className="w-4 h-4 text-gray-500" />
+                            {tool.name}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                  <kbd className="hidden sm:flex items-center gap-0.5 px-2 py-1 rounded-lg bg-gray-100 text-gray-500 text-xs font-medium">
-                    Press <span className="font-bold">/</span>
-                  </kbd>
                 </div>
-              </div>
-            </motion.div>
+              </motion.div>
+
+              {/* Quick Tools Grid */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-semibold text-slate-dark">Quick Actions</h2>
+                  <Link
+                    href="/tools"
+                    className="text-sm font-medium text-privacy-teal hover:underline flex items-center gap-1"
+                  >
+                    View all tools <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {QUICK_TOOLS.map((tool, index) => (
+                    <motion.div
+                      key={tool.slug}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + index * 0.05 }}
+                    >
+                      <Link
+                        href={`/tools/${tool.slug}`}
+                        className={cn(
+                          'block p-5 rounded-2xl bg-white border border-gray-200',
+                          'hover:border-gray-300 hover:shadow-md',
+                          'transition-all duration-200 group'
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            'w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center mb-4',
+                            tool.color
+                          )}
+                        >
+                          <tool.icon className="w-6 h-6 text-white" />
+                        </div>
+                        <h3 className="font-semibold text-slate-dark group-hover:text-privacy-teal transition-colors">
+                          {tool.name}
+                        </h3>
+                        <p className="text-sm text-gray-500 mt-1">{tool.description}</p>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+
+              {/* Features */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <div className="bg-gradient-to-br from-trust-blue to-privacy-teal rounded-2xl p-6 text-white">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="w-5 h-5" />
+                    <h2 className="font-semibold">Why PDFKit Pro?</h2>
+                  </div>
+
+                  <div className="grid sm:grid-cols-3 gap-6">
+                    {FEATURES.map((feature) => (
+                      <div key={feature.title}>
+                        <feature.icon className="w-8 h-8 mb-3 opacity-90" />
+                        <h3 className="font-semibold mb-1">{feature.title}</h3>
+                        <p className="text-sm text-white/80">{feature.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* User Card for non-authenticated */}
+              {!isAuthenticated && (
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="bg-white rounded-2xl border border-gray-200 p-6"
+                >
+                  <div className="text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-trust-blue to-privacy-teal flex items-center justify-center mx-auto mb-4">
+                      <Shield className="w-8 h-8 text-white" />
+                    </div>
+                    <h3 className="font-semibold text-slate-dark mb-2">Sign in to save your work</h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Access cloud backup, sync across devices, and more
+                    </p>
+                    <Link
+                      href="/auth/signin"
+                      className="block w-full py-3 px-4 rounded-xl bg-privacy-teal text-white font-medium hover:bg-privacy-teal/90 transition-colors"
+                    >
+                      Sign In
+                    </Link>
+                    <p className="text-xs text-gray-400 mt-3">
+                      Free tools work without an account
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Job Timeline */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <JobTimeline />
+              </motion.div>
+
+              {/* Privacy Badge */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Shield className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-emerald-800 text-sm">
+                      Privacy Protected
+                    </h3>
+                    <p className="text-xs text-emerald-700 mt-1">
+                      All files are processed locally on your device. Nothing is uploaded to any server.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           </div>
         </div>
-
-        {/* Main Content */}
-        <main className="max-w-6xl mx-auto px-4 lg:px-8 py-10">
-          {isSearching && searchResults.length > 0 ? (
-            // Search Results
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
-              <div className="flex items-center gap-2 mb-6">
-                <h2 className="text-lg font-semibold text-slate-dark">
-                  Search Results
-                </h2>
-                <span className="text-sm text-gray-400">
-                  {searchResults.length} tools found
-                </span>
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {searchResults.map((tool, index) => (
-                  <motion.div
-                    key={tool.slug}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <a
-                      href={`/tools/${tool.slug}`}
-                      className={cn(
-                        'block p-5 rounded-2xl bg-white/80 backdrop-blur-sm',
-                        'border border-gray-100/80 hover:border-privacy-teal/30',
-                        'shadow-soft hover:shadow-glass hover:-translate-y-1',
-                        'transition-all duration-200'
-                      )}
-                    >
-                      <h3 className="font-semibold text-slate-dark">
-                        {tool.name}
-                      </h3>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {tool.description}
-                      </p>
-                    </a>
-                  </motion.div>
-                ))}
-              </div>
-              <button
-                onClick={() => handleSearch('')}
-                className="mt-6 text-sm text-privacy-teal hover:underline"
-              >
-                Clear search
-              </button>
-            </motion.div>
-          ) : isSearching && searchResults.length === 0 ? (
-            // No Results
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center py-16"
-            >
-              <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-slate-dark mb-2">
-                No tools found
-              </h3>
-              <p className="text-gray-500 mb-4">
-                Try searching for something else
-              </p>
-              <button
-                onClick={() => handleSearch('')}
-                className="text-sm text-privacy-teal hover:underline"
-              >
-                Clear search
-              </button>
-            </motion.div>
-          ) : (
-            // Default View: Featured + Categories
-            <>
-              {/* Featured Tools Section */}
-              <FeaturedTools
-                userPlan={userPlan}
-                onUpgradeClick={handleUpgradeClick}
-              />
-
-              {/* Categorized Tools Sections */}
-              <AllToolSections
-                userPlan={userPlan}
-                onUpgradeClick={handleUpgradeClick}
-              />
-            </>
-          )}
-        </main>
-
-        {/* Credit Line Footer */}
-        <CreditLine />
-
-        {/* Upgrade Modal */}
-        <UpgradeModal
-          isOpen={isUpgradeOpen}
-          onClose={() => setIsUpgradeOpen(false)}
-          currentPlan={userPlan}
-        />
       </div>
-    </div>
+    </WorkspaceLayout>
   );
 }
