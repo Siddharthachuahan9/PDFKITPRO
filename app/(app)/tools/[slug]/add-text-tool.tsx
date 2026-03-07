@@ -1,62 +1,35 @@
+// ============================================
+// Add Text & Signature Tool — Sejda-style Editor
+// Full-page editor with click-to-add text,
+// drag/resize, floating toolbar, and burn-to-PDF.
+// ============================================
+
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { Plus, Type, AlignLeft, AlignCenter, AlignRight, Bold, Italic } from 'lucide-react';
-import ToolLayout, { ToolColumns, PanelHeader } from '@/components/ToolLayout';
+import { useState, useCallback } from 'react';
+import { Download, RefreshCw, Loader2, FileText } from 'lucide-react';
+import { motion } from 'framer-motion';
+import ToolLayout from '@/components/ToolLayout';
 import Dropzone from '@/components/Dropzone';
-import PdfViewer from '@/components/PdfViewer';
-import ActionBar from '@/components/ActionBar';
+import EditorCanvas from '@/components/pdf-editor/EditorCanvas';
 import { loadPdf, downloadFile } from '@/lib/pdf';
+import { burnTextAnnotations } from '@/lib/pdfExport';
 import { cn } from '@/lib/utils';
 import type { Tool, PdfFile, ProcessingStatus } from '@/types';
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
-
-interface TextAnnotation {
-  id: string;
-  text: string;
-  page: number;
-  x: number;
-  y: number;
-  fontSize: number;
-  color: string;
-  fontFamily: 'Helvetica' | 'Times' | 'Courier';
-  bold: boolean;
-  italic: boolean;
-  align: 'left' | 'center' | 'right';
-}
+import type { TextAnnotation, EditorTool } from '@/components/pdf-editor/types';
 
 interface AddTextToolProps {
   tool: Tool;
 }
 
-const COLORS = [
-  { name: 'Black', value: '#000000' },
-  { name: 'Red', value: '#ef4444' },
-  { name: 'Blue', value: '#3b82f6' },
-  { name: 'Green', value: '#22c55e' },
-  { name: 'Purple', value: '#8b5cf6' },
-  { name: 'Orange', value: '#f97316' },
-];
-
-const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
-
 export default function AddTextTool({ tool }: AddTextToolProps) {
   const [file, setFile] = useState<PdfFile | null>(null);
   const [status, setStatus] = useState<ProcessingStatus>('idle');
-  const [processedData, setProcessedData] = useState<ArrayBuffer | null>(null);
   const [annotations, setAnnotations] = useState<TextAnnotation[]>([]);
-  const [selectedAnnotation, setSelectedAnnotation] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [activeTool, setActiveTool] = useState<EditorTool>('text');
 
-  // New annotation defaults
-  const [newText, setNewText] = useState('Your text here');
-  const [fontSize, setFontSize] = useState(16);
-  const [fontColor, setFontColor] = useState('#000000');
-  const [fontFamily, setFontFamily] = useState<'Helvetica' | 'Times' | 'Courier'>('Helvetica');
-  const [bold, setBold] = useState(false);
-  const [italic, setItalic] = useState(false);
-  const [align, setAlign] = useState<'left' | 'center' | 'right'>('left');
-
+  // ---- File upload ----
   const handleFilesAdded = useCallback(async (newFiles: File[]) => {
     if (newFiles.length === 0) return;
 
@@ -68,367 +41,137 @@ export default function AddTextTool({ tool }: AddTextToolProps) {
     if (result.ok) {
       setFile(result.data);
       setAnnotations([]);
-      setSelectedAnnotation(null);
-      setCurrentPage(1);
+      setSelectedId(null);
+      setActiveTool('text');
     }
     setStatus('idle');
-    setProcessedData(null);
   }, []);
 
-  const handleAddAnnotation = useCallback(() => {
+  // ---- Download: burn annotations into PDF ----
+  const handleDownload = useCallback(async () => {
     if (!file) return;
 
-    const newAnnotation: TextAnnotation = {
-      id: `ann-${Date.now()}`,
-      text: newText,
-      page: currentPage,
-      x: 50, // Default position - center of page
-      y: 400,
-      fontSize,
-      color: fontColor,
-      fontFamily,
-      bold,
-      italic,
-      align,
-    };
+    // Filter out empty text boxes
+    const validAnnotations = annotations.filter((a) => a.text.trim().length > 0);
 
-    setAnnotations((prev) => [...prev, newAnnotation]);
-    setSelectedAnnotation(newAnnotation.id);
-  }, [file, newText, currentPage, fontSize, fontColor, fontFamily, bold, italic, align]);
-
-  const handleUpdateAnnotation = useCallback((id: string, updates: Partial<TextAnnotation>) => {
-    setAnnotations((prev) =>
-      prev.map((ann) => (ann.id === id ? { ...ann, ...updates } : ann))
-    );
-  }, []);
-
-  const handleRemoveAnnotation = useCallback((id: string) => {
-    setAnnotations((prev) => prev.filter((ann) => ann.id !== id));
-    if (selectedAnnotation === id) {
-      setSelectedAnnotation(null);
+    if (validAnnotations.length === 0) {
+      alert('No text annotations to save. Click on the PDF to add text first.');
+      return;
     }
-  }, [selectedAnnotation]);
-
-  const handleProcess = useCallback(async () => {
-    if (!file || annotations.length === 0) return;
 
     setStatus('processing');
     try {
-      const pdfDoc = await PDFDocument.load(file.data);
-      const pages = pdfDoc.getPages();
-
-      for (const annotation of annotations) {
-        const page = pages[annotation.page - 1];
-        if (!page) continue;
-
-        // Get the appropriate font
-        let fontKey = StandardFonts.Helvetica;
-        if (annotation.fontFamily === 'Times') {
-          fontKey = annotation.bold
-            ? (annotation.italic ? StandardFonts.TimesRomanBoldItalic : StandardFonts.TimesRomanBold)
-            : (annotation.italic ? StandardFonts.TimesRomanItalic : StandardFonts.TimesRoman);
-        } else if (annotation.fontFamily === 'Courier') {
-          fontKey = annotation.bold
-            ? (annotation.italic ? StandardFonts.CourierBoldOblique : StandardFonts.CourierBold)
-            : (annotation.italic ? StandardFonts.CourierOblique : StandardFonts.Courier);
-        } else {
-          fontKey = annotation.bold
-            ? (annotation.italic ? StandardFonts.HelveticaBoldOblique : StandardFonts.HelveticaBold)
-            : (annotation.italic ? StandardFonts.HelveticaOblique : StandardFonts.Helvetica);
-        }
-
-        const font = await pdfDoc.embedFont(fontKey);
-
-        // Parse color
-        const hex = annotation.color.replace('#', '');
-        const r = parseInt(hex.substring(0, 2), 16) / 255;
-        const g = parseInt(hex.substring(2, 4), 16) / 255;
-        const b = parseInt(hex.substring(4, 6), 16) / 255;
-
-        // Calculate x position based on alignment
-        const textWidth = font.widthOfTextAtSize(annotation.text, annotation.fontSize);
-        const pageWidth = page.getWidth();
-        let x = annotation.x;
-        if (annotation.align === 'center') {
-          x = (pageWidth - textWidth) / 2;
-        } else if (annotation.align === 'right') {
-          x = pageWidth - textWidth - 50;
-        }
-
-        page.drawText(annotation.text, {
-          x,
-          y: annotation.y,
-          size: annotation.fontSize,
-          font,
-          color: rgb(r, g, b),
-        });
-      }
-
-      const savedData = await pdfDoc.save();
-      setProcessedData(savedData.buffer as ArrayBuffer);
+      const resultBuffer = await burnTextAnnotations(file.data, validAnnotations);
+      const baseName = file.name.replace(/\.pdf$/i, '');
+      downloadFile(resultBuffer, `${baseName}-edited.pdf`);
       setStatus('complete');
     } catch (error) {
-      console.error('Failed to add text:', error);
+      console.error('Failed to export PDF:', error);
+      alert('Failed to save PDF. Please try again.');
       setStatus('error');
-      alert('Failed to add text to PDF');
     }
   }, [file, annotations]);
 
+  // ---- Reset everything ----
   const handleReset = useCallback(() => {
     setFile(null);
     setAnnotations([]);
-    setSelectedAnnotation(null);
+    setSelectedId(null);
     setStatus('idle');
-    setProcessedData(null);
-    setCurrentPage(1);
+    setActiveTool('text');
   }, []);
 
-  const handleDownload = useCallback(() => {
-    if (!processedData || !file) return;
-    const baseName = file.name.replace(/\.pdf$/i, '');
-    downloadFile(processedData, `${baseName}-edited.pdf`);
-  }, [processedData, file]);
+  // ---- Deselect when clicking outside ----
+  const handleCanvasDeselect = useCallback(() => {
+    setSelectedId(null);
+  }, []);
 
-  const hasFile = !!file;
-  const canProcess = hasFile && annotations.length > 0 && status !== 'processing';
-
-  const selectedAnn = annotations.find((a) => a.id === selectedAnnotation);
+  const validCount = annotations.filter((a) => a.text.trim().length > 0).length;
 
   return (
     <ToolLayout title={tool.name} description={tool.description}>
-      {!hasFile ? (
+      {!file ? (
+        /* Upload screen */
         <div className="max-w-2xl mx-auto">
           <Dropzone onFilesAdded={handleFilesAdded} multiple={false} />
         </div>
       ) : (
-        <ToolColumns
-          left={
-            <div className="space-y-4">
-              <PanelHeader title="Text Annotations" />
+        /* Editor screen */
+        <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 200px)' }}>
+          {/* Editor canvas takes up most of the space */}
+          <div className="flex-1 bg-white rounded-2xl shadow-soft p-4 lg:p-6">
+            <EditorCanvas
+              file={file}
+              annotations={annotations}
+              selectedId={selectedId}
+              activeTool={activeTool}
+              onAnnotationsChange={setAnnotations}
+              onSelectedChange={setSelectedId}
+            />
+          </div>
 
-              {/* Add new annotation */}
-              <div className="space-y-3 p-4 rounded-xl bg-gray-50">
-                <textarea
-                  value={newText}
-                  onChange={(e) => setNewText(e.target.value)}
-                  placeholder="Enter your text..."
-                  className="w-full p-3 rounded-lg border border-gray-200 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-privacy-teal/20 focus:border-privacy-teal"
-                  rows={2}
-                />
-
-                {/* Font controls */}
-                <div className="flex flex-wrap gap-2">
-                  <select
-                    value={fontFamily}
-                    onChange={(e) => setFontFamily(e.target.value as typeof fontFamily)}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm"
-                  >
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Times">Times</option>
-                    <option value="Courier">Courier</option>
-                  </select>
-
-                  <select
-                    value={fontSize}
-                    onChange={(e) => setFontSize(Number(e.target.value))}
-                    className="px-3 py-1.5 rounded-lg border border-gray-200 text-sm"
-                  >
-                    {FONT_SIZES.map((size) => (
-                      <option key={size} value={size}>{size}px</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Style buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setBold(!bold)}
-                    className={cn(
-                      'p-2 rounded-lg border transition-colors',
-                      bold ? 'bg-slate-dark text-white border-slate-dark' : 'border-gray-200 hover:bg-gray-100'
-                    )}
-                  >
-                    <Bold className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setItalic(!italic)}
-                    className={cn(
-                      'p-2 rounded-lg border transition-colors',
-                      italic ? 'bg-slate-dark text-white border-slate-dark' : 'border-gray-200 hover:bg-gray-100'
-                    )}
-                  >
-                    <Italic className="w-4 h-4" />
-                  </button>
-
-                  <div className="w-px h-6 bg-gray-200 mx-1" />
-
-                  <button
-                    onClick={() => setAlign('left')}
-                    className={cn(
-                      'p-2 rounded-lg border transition-colors',
-                      align === 'left' ? 'bg-slate-dark text-white border-slate-dark' : 'border-gray-200 hover:bg-gray-100'
-                    )}
-                  >
-                    <AlignLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setAlign('center')}
-                    className={cn(
-                      'p-2 rounded-lg border transition-colors',
-                      align === 'center' ? 'bg-slate-dark text-white border-slate-dark' : 'border-gray-200 hover:bg-gray-100'
-                    )}
-                  >
-                    <AlignCenter className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setAlign('right')}
-                    className={cn(
-                      'p-2 rounded-lg border transition-colors',
-                      align === 'right' ? 'bg-slate-dark text-white border-slate-dark' : 'border-gray-200 hover:bg-gray-100'
-                    )}
-                  >
-                    <AlignRight className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Color picker */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Color:</span>
-                  {COLORS.map((color) => (
-                    <button
-                      key={color.value}
-                      onClick={() => setFontColor(color.value)}
-                      className={cn(
-                        'w-6 h-6 rounded-full border-2 transition-all',
-                        fontColor === color.value ? 'border-slate-dark scale-110' : 'border-transparent'
-                      )}
-                      style={{ backgroundColor: color.value }}
-                      title={color.name}
-                    />
-                  ))}
-                </div>
-
+          {/* Bottom action bar */}
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className={cn(
+              'fixed bottom-0 left-0 right-0 lg:left-72',
+              'bg-white/95 backdrop-blur-md border-t border-gray-100',
+              'px-4 py-3 lg:px-6 z-20'
+            )}
+          >
+            <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
+              {/* Left: Reset + annotation count */}
+              <div className="flex items-center gap-3">
                 <button
-                  onClick={handleAddAnnotation}
-                  className="w-full py-2.5 rounded-xl bg-privacy-teal text-white font-medium hover:bg-privacy-teal/90 transition-colors flex items-center justify-center gap-2"
+                  onClick={handleReset}
+                  disabled={status === 'processing'}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-gray-600 hover:bg-gray-100 transition-colors disabled:opacity-50"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add to Page {currentPage}
+                  <RefreshCw className="w-4 h-4" />
+                  <span className="hidden sm:inline">Reset</span>
                 </button>
-              </div>
-
-              {/* Annotations list */}
-              {annotations.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-gray-700">
-                    Added Text ({annotations.length})
-                  </h4>
-                  {annotations.map((ann) => (
-                    <div
-                      key={ann.id}
-                      onClick={() => setSelectedAnnotation(ann.id)}
-                      className={cn(
-                        'p-3 rounded-lg border cursor-pointer transition-all',
-                        selectedAnnotation === ann.id
-                          ? 'border-privacy-teal bg-privacy-teal/5'
-                          : 'border-gray-200 hover:border-gray-300'
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-dark truncate">
-                            {ann.text}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Page {ann.page} • {ann.fontSize}px • {ann.fontFamily}
-                          </p>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveAnnotation(ann.id);
-                          }}
-                          className="text-gray-400 hover:text-rose-500 text-xs"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          }
-          center={
-            <div>
-              <PanelHeader
-                title="Preview"
-                action={
-                  file && (
-                    <span className="text-xs text-gray-500">
-                      Page {currentPage} of {file.pageCount}
-                    </span>
-                  )
-                }
-              />
-              <PdfViewer file={file} />
-            </div>
-          }
-          right={
-            <div>
-              <PanelHeader title="Output Settings" />
-              <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-gray-50">
-                  <p className="text-sm text-gray-600">
-                    <strong>{annotations.length}</strong> text annotation{annotations.length !== 1 ? 's' : ''} will be added to your PDF.
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-xl bg-privacy-teal/5 border border-privacy-teal/20">
-                  <div className="flex items-center gap-2 text-privacy-teal text-sm font-medium mb-1">
-                    <span className="w-2 h-2 rounded-full bg-privacy-teal animate-pulse" />
-                    Local Processing
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Your PDF is edited locally and never uploaded to any server.
-                  </p>
-                </div>
-
-                {status === 'complete' && (
-                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-                    <p className="text-sm text-emerald-700 font-medium">
-                      Text added successfully!
-                    </p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      Click Download to save your edited PDF.
-                    </p>
-                  </div>
+                {validCount > 0 && (
+                  <span className="text-sm text-gray-500 hidden sm:inline">
+                    {validCount} text box{validCount !== 1 ? 'es' : ''}
+                  </span>
                 )}
-
-                <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                  <p className="text-sm text-amber-700 font-medium mb-1">
-                    Tip
-                  </p>
-                  <p className="text-xs text-amber-600">
-                    Text position is approximate. For precise positioning, use coordinates in the Y position field.
-                  </p>
-                </div>
               </div>
-            </div>
-          }
-        />
-      )}
 
-      {hasFile && (
-        <ActionBar
-          status={status}
-          onProcess={handleProcess}
-          onReset={handleReset}
-          onDownload={handleDownload}
-          processLabel="Add Text"
-          downloadLabel="Download PDF"
-          disabled={!canProcess}
-        />
+              {/* Center: Privacy badge */}
+              <div className="hidden md:flex items-center gap-2 text-xs text-emerald-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                All editing is local — your files never leave your device
+              </div>
+
+              {/* Right: Download */}
+              <button
+                onClick={handleDownload}
+                disabled={validCount === 0 || status === 'processing'}
+                className={cn(
+                  'flex items-center gap-2 px-6 py-2.5 rounded-xl',
+                  'bg-gradient-to-r from-trust-blue to-privacy-teal',
+                  'text-white font-medium shadow-medium',
+                  'hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]',
+                  'transition-all duration-200',
+                  'disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100'
+                )}
+              >
+                {status === 'processing' ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Apply &amp; Download
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
     </ToolLayout>
   );
